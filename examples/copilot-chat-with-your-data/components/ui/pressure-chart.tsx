@@ -331,11 +331,17 @@ export function PressureChart({
                 textAnchor="end"
                 interval={0}
                 allowDataOverflow={true}
+                tick={{ fontSize: 10, fill: '#1e3a8a' }}
+                axisLine={{ stroke: '#1e3a8a' }}
+                tickLine={{ stroke: '#1e3a8a' }}
               />
               <YAxis 
                 domain={[minPressure * 0.9, maxPressure * 1.1]} 
                 padding={{ top: 20, bottom: 20 }}
                 allowDataOverflow={true}
+                tick={{ fontSize: 10, fill: '#1e3a8a' }}
+                axisLine={{ stroke: '#1e3a8a' }}
+                tickLine={{ stroke: '#1e3a8a' }}
               />
               <Tooltip content={<CustomTooltip />} />
               
