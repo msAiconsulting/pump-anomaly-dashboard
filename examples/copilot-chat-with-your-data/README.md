@@ -70,23 +70,39 @@ Navigate to [http://localhost:3000](http://localhost:3000) to see the applicatio
 
 Use these sample questions to test the AI assistant's capabilities with the pump data:
 
-### Basic Analysis
-1. What is the average pressure across all pumps?
-2. Show me the pressure trend for pump 3
-3. Which pump has the most anomalies?
+### GENERAL ANALYSIS
+- What is the average pressure across all pumps?
+- Show me the pressure trend for pump 3
+- Which pump has the most anomalies?
 
-### Detailed Insights
-4. When did pump 2 have its highest pressure reading?
-5. Compare the performance of pump 1 and pump 4
-6. Identify periods of unusual pressure fluctuations
+### TEMPORAL ANALYSIS
+- Can you tell me the time period of the failures?
+- What's the statistical distribution of anomalies across different operational shifts or time periods?
+- Are there correlations between ambient conditions (time of day, external temperature) and the frequency of anomalies?
 
-### Time-Based Analysis
-7. What time of day do pressure anomalies typically occur?
-8. Has any pump shown signs of failure?
-9. What's the correlation between pressure and time of day?
+### PRESSURE BEHAVIOR ANALYSIS
+- What were the pressure fluctuations just before the anomalies were detected?
+- What is the average PSI range during normal operation versus during anomalous periods?
+- Is there evidence of pressure pulsation that might indicate issues with the pump impeller or valve chatter?
+- How do the pressure readings compare to the manufacturer's specified operating ranges?
 
-### Predictive Insights
-10. Predict when pump 5 might need maintenance
+### PATTERN RECOGNITION
+- Are there any cyclic patterns in the pressure data that might indicate cavitation issues?
+- What are the common precursor patterns observed before major pressure excursions?
+- Can you extract the frequency characteristics of the pressure oscillations to help identify potential resonance issues?
+
+### CORRELATION & CAUSATION
+- Can you identify any correlation between pressure drops and subsequent equipment failures?
+- Can you compare the behavior of multiple sensors during the same anomaly events to determine if failures cascade through the system?
+- Do any of the anomalies correspond with known maintenance activities or process changes?
+- Can you identify any temperature-related variables that might be contributing to the pressure anomalies?
+- Do the anomalies appear to be more related to mechanical issues (sudden changes) or operational issues (gradual drift)?
+
+### EARLY WARNING & PREDICTION
+- What's the rate of pressure decline before failure events? This could help establish early warning thresholds.
+- Which sensor shows the earliest indication of abnormal behavior before a complete failure?
+- What would be appropriate alarm thresholds based on the historical anomaly patterns?
+- Can you create a failure mode prediction model based on the observed patterns in this dataset?
 
 ## Project Structure
 
