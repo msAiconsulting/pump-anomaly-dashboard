@@ -395,15 +395,15 @@ export function PressureChart({
                     );
                   }
                   
+                  // Return an invisible circle for non-anomaly points
                   return (
                     <circle 
                       key={`pressure-dot-${payload.originalTimestamp}`}
                       cx={cx} 
                       cy={cy} 
-                      r={3} 
-                      stroke="#8884d8" 
-                      strokeWidth={1.5}
-                      fill="white" 
+                      r={0} 
+                      fill="transparent" 
+                      stroke="transparent" 
                     />
                   );
                 }}
