@@ -224,7 +224,7 @@ export function PressureChart({
           {isAnomaly && (
             <p className="text-sm font-medium text-orange-500 mt-1">ANOMALY DETECTED</p>
           )}
-          {anomalyRegion > 0 && !isAnomaly && (
+          {anomalyRegion > 0 && (
             <p className="text-sm font-medium text-pink-500 mt-1">IN ANOMALY REGION</p>
           )}
         </div>
