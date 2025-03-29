@@ -191,6 +191,7 @@ export function PressureChart({
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const isAnomaly = payload.find((p: any) => p.name === 'isAnomaly')?.value;
+      const anomalyRegion = payload.find((p: any) => p.name === 'anomalyRegion')?.value;
       const originalTimestamp = payload[0]?.payload?.originalTimestamp;
       
       // Format the full date and time for the tooltip
@@ -222,6 +223,9 @@ export function PressureChart({
           })}
           {isAnomaly && (
             <p className="text-sm font-medium text-orange-500 mt-1">ANOMALY DETECTED</p>
+          )}
+          {anomalyRegion > 0 && !isAnomaly && (
+            <p className="text-sm font-medium text-pink-500 mt-1">IN ANOMALY REGION</p>
           )}
         </div>
       );
