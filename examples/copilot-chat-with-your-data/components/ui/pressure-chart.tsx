@@ -388,9 +388,10 @@ export function PressureChart({
                         key={`anomaly-dot-${payload.originalTimestamp}`}
                         cx={cx} 
                         cy={cy} 
-                        r={4} 
-                        fill="#FF9800" 
-                        stroke="#FF9800" 
+                        r={3} 
+                        fill="white" 
+                        stroke="#FF9800"
+                        strokeWidth={1.5}
                       />
                     );
                   }
