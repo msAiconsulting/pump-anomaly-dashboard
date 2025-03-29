@@ -10,8 +10,8 @@ export function Header() {
           <Image 
             src="/assets/intuigence.png" 
             alt="Intuigence" 
-            width={407} 
-            height={104} 
+            width={204} 
+            height={52} 
             priority 
           />
         </div>
