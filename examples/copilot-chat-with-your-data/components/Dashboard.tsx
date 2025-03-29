@@ -745,7 +745,7 @@ You can help the user interpret this data, suggest maintenance actions, or expla
             
             {/* Chart section with anomaly regions */}
             <div className="bg-white p-6 rounded-lg shadow-md">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">Pressure Readings Over Time</h2>
+              <h2 className="text-xl font-semibold text-gray-800 mb-4">Pressure Sensor Time Series</h2>
               
               <div className="flex flex-wrap gap-2 justify-start text-xs mb-4">
                 <p className="flex items-center">
