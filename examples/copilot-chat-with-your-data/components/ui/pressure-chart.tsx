@@ -426,18 +426,8 @@ export function PressureChart({
                 animationEasing="ease"
               />
               
-              <Legend 
-                payload={[
-                  { value: 'Pressure', type: 'line', color: '#8884d8' },
-                  { value: 'Rolling Mean', type: 'line', color: '#4caf50' },
-                  { value: 'Anomaly', type: 'circle', color: '#FF9800' },
-                  { value: 'Anomaly Region', type: 'rect', color: 'rgba(255, 150, 150, 0.9)' }
-                ]}
-                layout="horizontal"
-                verticalAlign="top"
-                align="center"
-                wrapperStyle={{ paddingBottom: '20px' }}
-              />
+              {/* Using default Legend instead of custom one */}
+              <Legend />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
