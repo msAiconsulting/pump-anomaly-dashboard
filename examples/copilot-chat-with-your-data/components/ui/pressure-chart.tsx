@@ -94,7 +94,7 @@ export function PressureChart({
     }
     
     // If the visible window is almost the whole dataset, just show everything
-    if (endIdx - startIdx + 1 >= chartData.length * 0.95) {
+    if (endIdx - startIdx + 1 >= chartData.length * 0.99) {
       handleResetZoom();
       return;
     }
@@ -108,18 +108,37 @@ export function PressureChart({
   const handleZoomIn = () => {
     setCurrentView('zoomed');
     setZoomLevel(prev => {
-      const factor = prev >= 5 ? 2 : 1.5;
-      return prev * factor;
+      // Zoom in by approximately 5% steps (showing 5% less data)
+      // If prev=1 (100%), next step is showing 95% (zoom level ≈ 1.053)
+      if (prev === 1) return 1.053;
+      
+      // For all other steps, increase by approximately 5% of visible data
+      // Convert current zoom to percentage visible, decrease by 5%, convert back
+      const visiblePercentage = 1 / prev;
+      const newVisiblePercentage = Math.max(0.05, visiblePercentage - 0.05);
+      return 1 / newVisiblePercentage;
     });
   };
 
   const handleZoomOut = () => {
-    const newLevel = zoomLevel / 1.5;
-    if (newLevel <= 1.2) {
+    // If we're at the first zoom level, go back to fit all
+    if (Math.abs(zoomLevel - 1.053) < 0.01) {
       handleResetZoom();
       return;
     }
-    setZoomLevel(newLevel);
+    
+    // Apply consistent 5% increments
+    // Convert current zoom to percentage visible, increase by 5%, convert back
+    const visiblePercentage = 1 / zoomLevel;
+    const newVisiblePercentage = Math.min(1, visiblePercentage + 0.05);
+    
+    // If we're very close to showing everything, reset zoom
+    if (newVisiblePercentage > 0.97) {
+      handleResetZoom();
+      return;
+    }
+    
+    setZoomLevel(1 / newVisiblePercentage);
     setCurrentView('zoomed');
   };
 
@@ -162,6 +181,11 @@ export function PressureChart({
       setZoomedData(chartData);
     }
   }, [data, chartData]);
+
+  // Update zoomed data whenever zoom level or center point changes
+  React.useEffect(() => {
+    updateZoomedData();
+  }, [updateZoomedData, zoomLevel, centerPoint, currentView]);
 
   // Custom tooltip to show formatted data
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -281,7 +305,7 @@ export function PressureChart({
         <div style={{ 
           width: '100%', 
           height: '100%', 
-          minWidth: currentView === 'all' ? `${Math.max(800, data.length * 3)}px` : `${zoomedData.length * 15}px` 
+          minWidth: currentView === 'all' ? `${Math.max(800, data.length * 3)}px` : `${zoomedData.length * 5}px` 
         }}>
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart
@@ -337,6 +361,9 @@ export function PressureChart({
                       stroke="rgba(255, 150, 150, 0.9)"
                       strokeWidth={1}
                       ifOverflow="extendDomain"
+                      isAnimationActive={true}
+                      animationDuration={1500}
+                      animationEasing="ease"
                     />
                   );
                 })}
@@ -377,7 +404,9 @@ export function PressureChart({
                   );
                 }}
                 activeDot={{ r: 8 }}
-                isAnimationActive={false}
+                isAnimationActive={true}
+                animationDuration={1500}
+                animationEasing="ease"
               />
               
               {/* Rolling mean line */}
@@ -389,7 +418,9 @@ export function PressureChart({
                 name="Rolling Mean"
                 dot={false}
                 strokeDasharray="5 5"
-                isAnimationActive={false}
+                isAnimationActive={true}
+                animationDuration={1500}
+                animationEasing="ease"
               />
               
               <Legend />
