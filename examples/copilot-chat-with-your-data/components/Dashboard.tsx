@@ -20,6 +20,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { AreaChart } from "./ui/area-chart";
 import { LineChart } from "./ui/line-chart";
 import { BarChart } from "./ui/bar-chart";
+import { PressureChart } from "./ui/pressure-chart";
 import { SearchResults } from "./generative-ui/SearchResults";
 
 // Comment out chart registration
@@ -741,141 +742,41 @@ You can help the user interpret this data, suggest maintenance actions, or expla
             
             {/* Chart section with anomaly regions */}
             <div className="bg-white p-6 rounded-lg shadow-md">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">Pump Data Analysis</h2>
+              <h2 className="text-xl font-semibold text-gray-800 mb-4">Pressure Readings Over Time</h2>
               
-              {/* Update the custom legend to remove Rolling Std */}
-              <div className="mb-4 text-sm text-gray-600 flex flex-wrap items-center space-x-6 justify-start">
+              <div className="flex flex-wrap gap-2 justify-start text-xs mb-4">
                 <p className="flex items-center">
-                  <span className="w-4 h-0.5 inline-block bg-teal-500 mr-2"></span>
+                  <span className="w-4 h-0.5 inline-block bg-purple-500 mr-2"></span>
                   Pressure
                 </p>
                 <p className="flex items-center">
-                  <span className="w-4 h-3 inline-block bg-pink-200 opacity-70 mr-2"></span>
+                  <span className="w-4 h-3 inline-block bg-red-200 mr-2" style={{ border: '1px solid rgba(255, 150, 150, 0.9)' }}></span>
                   Anomaly Region
                 </p>
                 <p className="flex items-center">
-                  <span className="w-4 h-0.5 inline-block border-b border-blue-500 border-dashed mr-2"></span>
+                  <span className="w-4 h-0.5 inline-block bg-green-500 mr-2"></span>
                   Rolling Mean
                 </p>
                 <p className="flex items-center">
-                  <span className="relative flex items-center justify-center w-4 h-4 mr-2">
-                    <span className="absolute w-0.5 h-4 bg-red-500 rotate-45"></span>
-                    <span className="absolute w-0.5 h-4 bg-red-500 -rotate-45"></span>
+                  <span className="w-4 h-4 flex items-center justify-center mr-2">
+                    <span className="w-3 h-3 rounded-full bg-orange-500"></span>
                   </span>
-                  Broken State
+                  Anomaly
                 </p>
               </div>
               
-              <div className="h-96">
+              <div className="h-[600px]">
                 {pumpData.length > 0 ? (
-                  <div className="relative h-full">
-                    {/* First layer: The anomaly regions as an area chart with pink fill */}
-                    <div className="absolute inset-0 z-0">
-                      <AreaChart
-                        data={pumpData.map((point, idx) => {
-                          // Skip first few data points that might render before visible time axis
-                          if (idx < 4) return {
-                            timestamp: new Date(point.timestamp).toLocaleDateString('en-US', {
-                              month: 'numeric',
-                              day: 'numeric'
-                            }),
-                            anomalyRegion: 0
-                          };
-                          
-                          return {
-                            timestamp: new Date(point.timestamp).toLocaleDateString('en-US', {
-                              month: 'numeric',
-                              day: 'numeric'
-                            }),
-                            // For each point, check if it's in an anomaly region
-                            anomalyRegion: (point.pressure > 70 || point.pressure < 35 || 
-                                           brokenStates.includes(idx) || 
-                                           anomalies.includes(idx)) ? 100 : 0
-                          };
-                        })}
-                        index="timestamp"
-                        categories={["anomalyRegion"]}
-                        colors={["rgba(252, 231, 243, 0.7)"]} // Light pink (pink-200) with transparency
-                        valueFormatter={(value: number) => ``} // No value formatting needed
-                        showLegend={false}
-                        showGrid={false}
-                        showXAxis={false}
-                        showYAxis={false}
-                      />
-                    </div>
-
-                    {/* Second layer: The main line chart with pressure and statistics */}
-                    <LineChart
-                      data={pumpData.map((point, idx) => {
-                        // Only include data points that will appear in the visible area
-                        if (idx < 4) {
-                          // For the first few points, return null values to create space
-                          return {
-                            timestamp: new Date(point.timestamp).toLocaleDateString('en-US', {
-                              month: 'numeric',
-                              day: 'numeric'
-                            }),
-                            pressure: undefined,
-                            rollingMean: undefined
-                          };
-                        }
-
-                        return {
-                          timestamp: new Date(point.timestamp).toLocaleDateString('en-US', {
-                            month: 'numeric',
-                            day: 'numeric'
-                          }),
-                          pressure: point.pressure,
-                          rollingMean: rollingStats.mean[idx]?.value ?? undefined,
-                        };
-                      })}
-                      index="timestamp"
-                      categories={["pressure", "rollingMean"]}
-                      colors={[
-                        "rgb(75, 192, 192)", // Pressure - Teal (original)
-                        "rgba(54, 162, 235, 0.8)", // Rolling Mean - Blue (original)
-                      ]}
-                      valueFormatter={(value: number) => `${value} PSI`}
-                      showLegend={false}
-                      showGrid={true}
-                    />
-
-                    {/* Third layer: Overlay broken state markers directly on pressure points */}
-                    {brokenStates.map((idx) => {
-                      // Skip markers too close to y-axis or too early in the dataset
-                      if (idx < 4) return null;
-                      
-                      // Get exact pressure value for vertical alignment
-                      const pressure = pumpData[idx]?.pressure || 0;
-                      
-                      // Calculate position to align directly with pressure line
-                      // Use chart y-axis scale to position marker
-                      const topPosition = 100 - ((pressure - metrics.minPressure) / 
-                                        (metrics.maxPressure - metrics.minPressure) * 80);
-                      
-                      // Horizontal position calculation - adjust to ensure markers are within visible time axis
-                      // The 94% is to account for the chart's right padding
-                      const leftPosition = ((idx - 4) / (pumpData.length - 4)) * 94;
-                      
-                      return (
-                        <div 
-                          key={`broken-${idx}`}
-                          className="absolute flex items-center justify-center pointer-events-none z-10"
-                          style={{
-                            left: `${leftPosition}%`,
-                            top: `${topPosition}%`,
-                            width: '8px',  // Smaller marker
-                            height: '8px', // Smaller marker
-                            transform: 'translate(-50%, -50%)',
-                          }}
-                        >
-                          {/* Smaller X marker for broken states */}
-                          <div className="absolute w-0.5 h-3 bg-red-500 rotate-45"></div>
-                          <div className="absolute w-0.5 h-3 bg-red-500 -rotate-45"></div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <PressureChart
+                    data={pumpData.map((point, idx) => ({
+                      timestamp: point.timestamp,
+                      pressure: point.pressure,
+                      rollingMean: rollingStats.mean[idx]?.value ?? undefined
+                    }))}
+                    anomalies={anomalies}
+                    minPressure={metrics.minPressure}
+                    maxPressure={metrics.maxPressure}
+                  />
                 ) : (
                   <div className="flex items-center justify-center h-full bg-gray-50 rounded-md">
                     <p className="text-gray-500">No data available</p>
