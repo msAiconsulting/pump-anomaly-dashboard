@@ -768,7 +768,7 @@ You can help the user interpret this data, suggest maintenance actions, or expla
                 </p>
               </div>
               
-              <div className="h-[600px] mb-6">
+              <div className="h-[600px] mb-0">
                 {pumpData.length > 0 ? (
                   <PressureChart
                     data={pumpData.map((point, idx) => ({
