@@ -672,10 +672,6 @@ You can help the user interpret this data, suggest maintenance actions, or expla
   return (
     <div className="bg-gray-50 min-h-screen">
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-gray-800 mb-6">
-          Pump Pressure Monitoring Dashboard
-        </h1>
-        
         {/* Display loading state */}
         {isLoading && (
           <div className="flex items-center justify-center p-4 mb-6 bg-blue-50 rounded-md">
