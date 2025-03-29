@@ -66,19 +66,26 @@ npm run dev
 
 Navigate to [http://localhost:3000](http://localhost:3000) to see the application.
 
-## Sample Questions for the AI Assistant
+## Sample Questions for the Pump Data Assistant
 
-The AI assistant can answer questions about the pump data. Here are some examples:
+Use these sample questions to test the AI assistant's capabilities with the pump data:
 
+### Basic Analysis
 1. What is the average pressure across all pumps?
 2. Show me the pressure trend for pump 3
 3. Which pump has the most anomalies?
+
+### Detailed Insights
 4. When did pump 2 have its highest pressure reading?
 5. Compare the performance of pump 1 and pump 4
 6. Identify periods of unusual pressure fluctuations
+
+### Time-Based Analysis
 7. What time of day do pressure anomalies typically occur?
 8. Has any pump shown signs of failure?
 9. What's the correlation between pressure and time of day?
+
+### Predictive Insights
 10. Predict when pump 5 might need maintenance
 
 ## Project Structure
