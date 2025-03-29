@@ -379,39 +379,37 @@ export function PressureChart({
                 stroke="#8884d8"
                 strokeWidth={2}
                 name="Pressure"
-                dot={(props) => {
-                  const { cx, cy, payload } = props;
-                  
-                  if (payload.isAnomaly) {
-                    return (
-                      <circle 
-                        key={`anomaly-dot-${payload.originalTimestamp}`}
-                        cx={cx} 
-                        cy={cy} 
-                        r={3} 
-                        fill="white" 
-                        stroke="#FF9800"
-                        strokeWidth={1.5}
-                      />
-                    );
-                  }
-                  
-                  // Return an invisible circle for non-anomaly points
-                  return (
-                    <circle 
-                      key={`pressure-dot-${payload.originalTimestamp}`}
-                      cx={cx} 
-                      cy={cy} 
-                      r={0} 
-                      fill="transparent" 
-                      stroke="transparent" 
-                    />
-                  );
-                }}
+                dot={false}
                 activeDot={{ r: 8 }}
                 isAnimationActive={true}
                 animationDuration={1500}
                 animationEasing="ease"
+              />
+              
+              {/* Anomaly series - scatter points showing only anomalies */}
+              <Line
+                dataKey="pressure"
+                data={zoomedData.filter(d => d.isAnomaly)}
+                name="Anomaly"
+                stroke="transparent"
+                fill="white"
+                strokeWidth={0}
+                dot={{
+                  r: 3,
+                  fill: "white",
+                  stroke: "#FF9800",
+                  strokeWidth: 1.5
+                }}
+                activeDot={{
+                  r: 6,
+                  fill: "white",
+                  stroke: "#FF9800",
+                  strokeWidth: 2
+                }}
+                isAnimationActive={true}
+                animationDuration={1500}
+                animationEasing="ease"
+                legendType="circle"
               />
               
               {/* Rolling mean line */}
@@ -428,7 +426,14 @@ export function PressureChart({
                 animationEasing="ease"
               />
               
-              <Legend />
+              <Legend 
+                payload={[
+                  { value: 'Pressure', type: 'line', color: '#8884d8' },
+                  { value: 'Rolling Mean', type: 'line', color: '#4caf50' },
+                  { value: 'Anomaly', type: 'circle', color: '#FF9800' },
+                  { value: 'Anomaly Region', type: 'rect', color: 'rgba(255, 150, 150, 0.9)' }
+                ]}
+              />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
