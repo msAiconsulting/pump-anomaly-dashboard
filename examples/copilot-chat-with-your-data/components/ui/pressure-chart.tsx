@@ -433,6 +433,10 @@ export function PressureChart({
                   { value: 'Anomaly', type: 'circle', color: '#FF9800' },
                   { value: 'Anomaly Region', type: 'rect', color: 'rgba(255, 150, 150, 0.9)' }
                 ]}
+                layout="horizontal"
+                verticalAlign="top"
+                align="center"
+                wrapperStyle={{ paddingBottom: '20px' }}
               />
             </ComposedChart>
           </ResponsiveContainer>
