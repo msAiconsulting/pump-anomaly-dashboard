@@ -1,222 +1,895 @@
 "use client";
 
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import Papa from 'papaparse';
+// Comment out problematic chart imports
+// import { Line } from 'react-chartjs-2';
+// import {
+//   Chart as ChartJS,
+//   CategoryScale,
+//   LinearScale,
+//   PointElement,
+//   LineElement,
+//   Title,
+//   Tooltip,
+//   Legend,
+//   Filler
+// } from 'chart.js';
+import { useCopilotAction } from "@copilotkit/react-core";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
-import { useCopilotAction, useCopilotReadable } from "@copilotkit/react-core";
 import { AreaChart } from "./ui/area-chart";
+import { LineChart } from "./ui/line-chart";
 import { BarChart } from "./ui/bar-chart";
-import { DonutChart } from "./ui/pie-chart";
 import { SearchResults } from "./generative-ui/SearchResults";
-import { 
-  salesData, 
-  productData, 
-  categoryData, 
-  regionalData,
-  demographicsData,
-  calculateTotalRevenue,
-  calculateTotalProfit,
-  calculateTotalCustomers,
-  calculateConversionRate,
-  calculateAverageOrderValue,
-  calculateProfitMargin
-} from "../data/dashboard-data";
 
-export function Dashboard() {
-  // Calculate metrics
-  const totalRevenue = calculateTotalRevenue();
-  const totalProfit = calculateTotalProfit();
-  const totalCustomers = calculateTotalCustomers();
-  const conversionRate = calculateConversionRate();
-  const averageOrderValue = calculateAverageOrderValue();
-  const profitMargin = calculateProfitMargin();
+// Comment out chart registration
+// ChartJS.register(
+//   CategoryScale,
+//   LinearScale,
+//   PointElement,
+//   LineElement,
+//   Title,
+//   Tooltip,
+//   Legend,
+//   Filler
+// );
 
-  // Make data available to the Copilot
-  useCopilotReadable({
-    description: "Dashboard data including sales trends, product performance, and category distribution",
-    value: {
-      salesData,
-      productData,
-      categoryData,
-      regionalData,
-      demographicsData,
-      metrics: {
-        totalRevenue,
-        totalProfit,
-        totalCustomers,
-        conversionRate,
-        averageOrderValue,
-        profitMargin
-      }
-    }
+// Define data interfaces
+interface PumpDataPoint {
+  timestamp: Date;
+  pressure: number;
+  machine_status: string;
+}
+
+interface RollingStatsPoint {
+  timestamp: string;
+  value: number;
+}
+
+interface TimeSeriesDataPoint {
+  timestamp: string;
+  pressure: number;
+  rollingMean: number;
+  rollingStd: number;
+  isAnomaly: number;
+  isBroken: number;
+  [key: string]: string | number; // Index signature for chart component
+}
+
+interface PressureDistribution {
+  range: string;
+  count: number;
+  percentage: number;
+  [key: string]: string | number; // Index signature for chart component
+}
+
+interface PatternData {
+  pattern: string;
+  count: number;
+  [key: string]: string | number; // Index signature for chart component
+}
+
+interface PumpMetrics {
+  averagePressure: number;
+  maxPressure: number;
+  minPressure: number;
+  anomalyCount: number;
+  brokenStateDuration: number;
+  anomalyFrequency: number;
+}
+
+// Define chat message interface
+interface ChatMessage {
+  role: string;
+  content: string;
+}
+
+// Mock useChat hook if the real one doesn't exist
+const useChat = () => {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState('');
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInput(e.target.value);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim()) return;
+    
+    setMessages(prev => [...prev, { role: 'user', content: input }]);
+    
+    // Simulate AI response
+    setTimeout(() => {
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: `I received your question about: "${input}". The dashboard shows pump pressure data.` 
+      }]);
+    }, 1000);
+    
+    setInput('');
+  };
+
+  return { messages, input, handleInputChange, handleSubmit };
+};
+
+// The Dashboard component
+export default function Dashboard() {
+  // Base state
+  const [pumpData, setPumpData] = useState<PumpDataPoint[]>([]);
+  const [timeRange, setTimeRange] = useState<[Date, Date]>([new Date(), new Date()]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  // Create the ref at component scope
+  const anomaliesRef = useRef<number[]>([]);
+  
+  // Derived state from analysis
+  const [metrics, setMetrics] = useState<PumpMetrics>({
+    averagePressure: 0,
+    maxPressure: 0,
+    minPressure: 0,
+    anomalyCount: 0,
+    brokenStateDuration: 0,
+    anomalyFrequency: 0
   });
-
-  // Define render only search action
+  
+  const [rollingStats, setRollingStats] = useState<{
+    mean: RollingStatsPoint[];
+    std: RollingStatsPoint[];
+  }>({
+    mean: [],
+    std: []
+  });
+  
+  const [anomalies, setAnomalies] = useState<number[]>([]);
+  const [brokenStates, setBrokenStates] = useState<number[]>([]);
+  
+  // File path for the CSV data - update with a path that exists
+  const csvUrl = useMemo(() => {
+    return '/pump_pressure_data.csv';
+  }, []);
+  
+  // CopilotKit integration
+  const { messages, input, handleInputChange, handleSubmit } = useChat();
+  
+  // Make data available to CopilotKit
   useCopilotAction({
-    name: "searchInternet",
-    available: "disabled",
-    description: "Searches the internet for information.",
+    name: "getPumpData",
+    description: "Get the pump pressure data points",
     parameters: [
       {
-        name: "query",
-        type: "string",
-        description: "The query to search the internet for.",
-        required: true,
+        name: "count",
+        type: "number",
+        description: "Number of data points to retrieve. Default is 10.",
       }
     ],
-    render: ({args, status}) => {
-      return <SearchResults query={args.query || 'No query provided'} status={status} />;
+    handler: async ({ count = 10 }) => {
+      const limit = Math.min(count, pumpData.length);
+      return pumpData.slice(0, limit);
     }
   });
-
-  // Color palettes for different charts
-  const colors = {
-    salesOverview: ["#3b82f6", "#10b981", "#ef4444"],  // Blue, Green, Red
-    productPerformance: ["#8b5cf6", "#6366f1", "#4f46e5"],  // Purple spectrum
-    categories: ["#3b82f6", "#64748b", "#10b981", "#f59e0b", "#94a3b8"],  // Mixed
-    regional: ["#059669", "#10b981", "#34d399", "#6ee7b7", "#a7f3d0"],  // Green spectrum
-    demographics: ["#f97316", "#f59e0b", "#eab308", "#facc15", "#fde047"]  // Orange to Yellow
-  };
   
+  useCopilotAction({
+    name: "getPumpMetrics",
+    description: "Get the calculated metrics about the pump pressure data",
+    parameters: [],
+    handler: async () => {
+      return metrics;
+    }
+  });
+  
+  useCopilotAction({
+    name: "getAnomalies",
+    description: "Get the detected anomalies in the data",
+    parameters: [],
+    handler: async () => {
+      return anomalies.map(idx => pumpData[idx]);
+    }
+  });
+  
+  // Fix useCopilotContext call
+  const contextString = `You are a knowledgeable assistant helping with a pump pressure monitoring system. The system monitors pressure readings from industrial pumps and detects anomalies.
+      
+This dashboard visualizes pressure readings over time, with anomaly detection and statistical analysis. Currently showing data from 1 sensor.
+
+Key metrics displayed:
+- Average pressure: ${metrics.averagePressure} PSI
+- Maximum pressure: ${metrics.maxPressure} PSI
+- Minimum pressure: ${metrics.minPressure} PSI
+- Number of anomalies detected: ${metrics.anomalyCount}
+- Anomaly frequency: ${metrics.anomalyFrequency}%
+- Total broken state duration: ${metrics.brokenStateDuration} time units
+
+The dashboard shows ${pumpData.length} data points from ${timeRange[0]?.toLocaleString() || 'N/A'} to ${timeRange[1]?.toLocaleString() || 'N/A'}.
+
+You can help the user interpret this data, suggest maintenance actions, or explain the anomaly detection methodology.`;
+
+  try {
+    // useCopilotContext(contextString);
+  } catch (error) {
+    console.log("Error setting CopilotContext:", error);
+  }
+  
+  // Load data - only attempt to load data once on mount with csvUrl
+  useEffect(() => {
+    let isComponentMounted = true;
+    
+    async function loadData() {
+      if (!isComponentMounted) return;
+      
+      try {
+        setIsLoading(true);
+        setError(null);
+        console.log(`Attempting to fetch pump data from ${csvUrl}`);
+        
+        const response = await fetch(csvUrl);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+        }
+        
+        const textData = await response.text();
+        console.log(`Received data (first 100 chars): ${textData.substring(0, 100)}`);
+        
+        // Parse CSV data 
+        const parseResult = Papa.parse(textData, {
+          header: true,
+          dynamicTyping: true,
+          skipEmptyLines: true
+        });
+        
+        if (!parseResult.data || !Array.isArray(parseResult.data)) {
+          throw new Error('Failed to parse CSV data');
+        }
+        
+        if (!isComponentMounted) return;
+        
+        // Process the successfully parsed data
+        const processedData = processRawData(parseResult.data);
+        
+        if (processedData.length === 0) {
+          throw new Error('No valid data points found in CSV');
+        }
+        
+        if (!isComponentMounted) return;
+        
+        // Update data state
+        setPumpData(processedData);
+        setTimeRange([
+          processedData[0].timestamp,
+          processedData[processedData.length - 1].timestamp
+        ]);
+        
+        // Run data analysis after state updates in the next cycle
+        if (isComponentMounted) {
+          setTimeout(() => {
+            if (isComponentMounted) {
+              const statsData = calculateDataStats(processedData);
+              setMetrics(statsData.metrics);
+              setRollingStats(statsData.rollingStats);
+              setBrokenStates(statsData.brokenStates);
+              setAnomalies(statsData.anomalies);
+            }
+          }, 10);
+        }
+        
+        setIsLoading(false);
+      } catch (err) {
+        console.error('Error loading data:', err);
+        if (isComponentMounted) {
+          setError(err instanceof Error ? err.message : 'Unknown error loading data');
+          setIsLoading(false);
+        }
+      }
+    }
+    
+    loadData();
+    
+    // Cleanup function to prevent setting state after unmount
+    return () => {
+      isComponentMounted = false;
+    };
+  }, [csvUrl]);
+  
+  // Update chart rendering when data changes
+  useEffect(() => {
+    if (pumpData.length > 0) {
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+      }, 100);
+    }
+  }, [pumpData.length]);
+  
+  // Pure functions for data processing - isolated from state
+  function processRawData(rawData: any[]): PumpDataPoint[] {
+    const processedData: PumpDataPoint[] = [];
+    
+    // Safely process each row
+    for (let i = 0; i < rawData.length; i++) {
+      const row = rawData[i];
+      
+      if (!row || typeof row !== 'object') continue;
+      
+      // Find sensor columns (they should start with "sensor_")
+      const sensorKeys = Object.keys(row).filter(key => 
+        typeof key === 'string' && key.startsWith('sensor_')
+      );
+      
+      if (sensorKeys.length === 0) continue;
+      
+      // Just use the first sensor found
+      const sensorKey = sensorKeys[0];
+      
+      // Check that we have valid data in this row
+      if (!row.timestamp || !row[sensorKey] || isNaN(Number(row[sensorKey]))) {
+        continue;
+      }
+      
+      // Create a data point
+      processedData.push({
+        timestamp: new Date(row.timestamp), 
+        pressure: Number(row[sensorKey]),
+        machine_status: String(row.machine_status || 'NORMAL')
+      });
+    }
+    
+    // Sort by timestamp
+    return processedData.sort((a, b) => 
+      a.timestamp.getTime() - b.timestamp.getTime()
+    );
+  }
+  
+  // Calculate all derived statistics from data in a pure function
+  function calculateDataStats(data: PumpDataPoint[]) {
+    // Prepare return structure
+    const result = {
+      metrics: {
+        averagePressure: 0,
+        maxPressure: 0,
+        minPressure: 0,
+        anomalyCount: 0,
+        brokenStateDuration: 0,
+        anomalyFrequency: 0
+      } as PumpMetrics,
+      rollingStats: {
+        mean: [] as RollingStatsPoint[],
+        std: [] as RollingStatsPoint[]
+      },
+      brokenStates: [] as number[],
+      anomalies: [] as number[]
+    };
+    
+    if (!data.length) return result;
+    
+    // Extract pressure values
+    const pressureValues = data.map(d => d.pressure);
+    
+    // Calculate basic metrics
+    const sum = pressureValues.reduce((a, b) => a + b, 0);
+    const mean = sum / pressureValues.length;
+    const max = Math.max(...pressureValues);
+    const min = Math.min(...pressureValues);
+    
+    // Calculate standard deviation
+    const squaredDiffs = pressureValues.map(p => Math.pow(p - mean, 2));
+    const avgSquaredDiff = squaredDiffs.reduce((a, b) => a + b, 0) / squaredDiffs.length;
+    const stdDev = Math.sqrt(avgSquaredDiff);
+    
+    // Find broken states
+    const brokenStateIndices = data.map((d, idx) => 
+      d.machine_status === 'BROKEN' ? idx : -1
+    ).filter(idx => idx !== -1);
+    
+    // Detect anomalies using z-score method
+    const zScoreThreshold = 2.5;
+    const anomalyIndices = data.map((d, idx) => {
+      const zScore = Math.abs(d.pressure - mean) / stdDev;
+      return zScore > zScoreThreshold ? idx : -1;
+    }).filter(idx => idx !== -1);
+    
+    // Calculate rolling statistics
+    const windowSize = Math.max(20, Math.floor(data.length / 50));
+    const rollingMean: RollingStatsPoint[] = [];
+    const rollingStd: RollingStatsPoint[] = [];
+    
+    for (let i = 0; i < data.length; i++) {
+      const windowStart = Math.max(0, i - windowSize);
+      const window = data.slice(windowStart, i + 1);
+      const windowValues = window.map(d => d.pressure);
+      
+      // Calculate window mean
+      const windowSum = windowValues.reduce((a, b) => a + b, 0);
+      const windowMean = windowSum / windowValues.length;
+      
+      // Calculate window std dev
+      const windowSquaredDiffs = windowValues.map(p => Math.pow(p - windowMean, 2));
+      const windowAvgSquaredDiff = windowSquaredDiffs.reduce((a, b) => a + b, 0) / windowSquaredDiffs.length;
+      const windowStdDev = Math.sqrt(windowAvgSquaredDiff);
+      
+      rollingMean.push({
+        timestamp: data[i].timestamp.toISOString(),
+        value: Number(windowMean.toFixed(2))
+      });
+      
+      rollingStd.push({
+        timestamp: data[i].timestamp.toISOString(),
+        value: Number(windowStdDev.toFixed(2))
+      });
+    }
+    
+    // Build result object
+    result.metrics = {
+      averagePressure: Number(mean.toFixed(2)),
+      maxPressure: Number(max.toFixed(2)),
+      minPressure: Number(min.toFixed(2)),
+      anomalyCount: anomalyIndices.length,
+      brokenStateDuration: brokenStateIndices.length,
+      anomalyFrequency: Number(((anomalyIndices.length / data.length) * 100).toFixed(2))
+    };
+    
+    result.rollingStats = {
+      mean: rollingMean,
+      std: rollingStd
+    };
+    
+    result.brokenStates = brokenStateIndices;
+    result.anomalies = anomalyIndices;
+    
+    return result;
+  }
+  
+  // Prepare chart data
+  const chartData = useMemo(() => {
+    if (!pumpData.length) return {
+      labels: [],
+      datasets: []
+    };
+    
+    // Format timestamps as abbreviated dates (MM/DD) instead of time
+    const labels = pumpData.map(row => {
+      const date = new Date(row.timestamp);
+      return `${date.getMonth() + 1}/${date.getDate()}`; // MM/DD format
+    });
+    
+    // Format pressure readings
+    const pressureData = pumpData.map(row => row.pressure);
+    
+    // Format mean/std bands if available
+    let meanData: (number | undefined)[] = [];
+    let upperBandData: (number | undefined)[] = [];
+    let lowerBandData: (number | undefined)[] = [];
+    
+    if (rollingStats.mean.length > 0 && rollingStats.std.length > 0) {
+      meanData = rollingStats.mean.map(point => point.value);
+      
+      upperBandData = rollingStats.mean.map((mean, idx) => {
+        const std = rollingStats.std[idx]?.value || 0;
+        return mean.value + (2 * std);
+      });
+      
+      lowerBandData = rollingStats.mean.map((mean, idx) => {
+        const std = rollingStats.std[idx]?.value || 0;
+        return mean.value - (2 * std);
+      });
+    }
+    
+    // Highlight anomalies in the chart
+    const anomalyData = pumpData.map((_, idx) => {
+      return anomalies.includes(idx) ? pressureData[idx] : undefined;
+    });
+    
+    // Highlight broken states in the chart
+    const brokenData = pumpData.map((_, idx) => {
+      return brokenStates.includes(idx) ? pressureData[idx] : undefined;
+    });
+    
+    return {
+      labels,
+      datasets: [
+        {
+          label: 'Pressure',
+          data: pressureData,
+          borderColor: 'rgb(75, 192, 192)',
+          backgroundColor: 'rgba(75, 192, 192, 0.5)',
+          tension: 0.1,
+          pointRadius: 0.5,
+          borderWidth: 1
+        },
+        {
+          label: 'Mean',
+          data: meanData,
+          borderColor: 'rgba(54, 162, 235, 0.8)',
+          backgroundColor: 'transparent',
+          tension: 0.1,
+          pointRadius: 0,
+          borderWidth: 1,
+          borderDash: [5, 5]
+        },
+        {
+          label: 'Upper Band',
+          data: upperBandData,
+          borderColor: 'rgba(54, 162, 235, 0.3)',
+          backgroundColor: 'transparent',
+          tension: 0.1,
+          pointRadius: 0,
+          borderWidth: 1,
+          borderDash: [3, 3]
+        },
+        {
+          label: 'Lower Band',
+          data: lowerBandData,
+          borderColor: 'rgba(54, 162, 235, 0.3)',
+          backgroundColor: 'transparent',
+          tension: 0.1,
+          pointRadius: 0,
+          borderWidth: 1,
+          borderDash: [3, 3]
+        },
+        {
+          label: 'Anomalies',
+          data: anomalyData,
+          borderColor: 'rgba(255, 99, 132, 1)',
+          backgroundColor: 'rgba(255, 99, 132, 1)',
+          tension: 0,
+          pointRadius: 4,
+          pointStyle: 'rectRot',
+          showLine: false
+        },
+        {
+          label: 'Broken States',
+          data: brokenData,
+          borderColor: 'rgba(255, 159, 64, 1)',
+          backgroundColor: 'rgba(255, 159, 64, 1)',
+          tension: 0,
+          pointRadius: 0,
+          showLine: false
+        }
+      ]
+    };
+  }, [pumpData, rollingStats, anomalies, brokenStates]);
+  
+  // Chart options
+  const chartOptions = useMemo(() => {
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      animations: {
+        tension: {
+          duration: 1000,
+          easing: 'linear',
+          from: 0.8,
+          to: 0.2,
+          loop: false
+        }
+      },
+      scales: {
+        y: {
+          title: {
+            display: true,
+            text: 'Pressure (PSI)'
+          }
+        },
+        x: {
+          title: {
+            display: true,
+            text: 'Time'
+          }
+        }
+      },
+      plugins: {
+        legend: {
+          position: 'top' as const,
+        },
+        title: {
+          display: true,
+          text: 'Pump Pressure Over Time'
+        },
+        tooltip: {
+          callbacks: {
+            title: function(context: any) {
+              const idx = context[0].dataIndex;
+              if (idx >= 0 && idx < pumpData.length) {
+                const date = new Date(pumpData[idx].timestamp);
+                return date.toLocaleString();
+              }
+              return '';
+            }
+          }
+        }
+      }
+    };
+  }, [pumpData]);
+  
+  // Debug button event handler
+  const handleTestFetch = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log(`Testing direct fetch from ${csvUrl}`);
+      const response = await fetch(csvUrl);
+      
+      if (response.ok) {
+        const text = await response.text();
+        console.log(`Success! First 100 chars: ${text.substring(0, 100)}`);
+        alert(`File fetched successfully! Size: ${text.length} bytes`);
+        
+        // Process the data
+        const results = Papa.parse(text, {
+          header: true,
+          dynamicTyping: true,
+          skipEmptyLines: true
+        });
+        
+        const processedData = processRawData(results.data);
+        
+        if (processedData.length > 0) {
+          setPumpData(processedData);
+          setTimeRange([
+            processedData[0].timestamp,
+            processedData[processedData.length - 1].timestamp
+          ]);
+          
+          // Run data analysis
+          const statsData = calculateDataStats(processedData);
+          setMetrics(statsData.metrics);
+          setRollingStats(statsData.rollingStats);
+          setBrokenStates(statsData.brokenStates);
+          setAnomalies(statsData.anomalies);
+        } else {
+          setError('No valid data points found in the CSV');
+        }
+      } else {
+        console.error(`Fetch failed: ${response.status} ${response.statusText}`);
+        setError(`Fetch failed: ${response.status} ${response.statusText}`);
+      }
+    } catch (e) {
+      console.error("Fetch error:", e);
+      setError(e instanceof Error ? e.message : 'Unknown error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Replace Chart components with placeholder divs
+  // In the render section where Line components are used:
+  // Replace:
+  // <Line data={chartData} options={chartOptions} />
+  // With:
+  // <div className="h-full w-full bg-gray-100 rounded flex items-center justify-center">
+  //   <p className="text-gray-500">Chart will render here</p>
+  // </div>
+
+  // Replace anomaliesRef when anomalies changes
+  useEffect(() => {
+    if (typeof anomaliesRef?.current !== 'undefined') {
+      anomaliesRef.current = anomalies;
+    }
+  }, [anomalies]);
+
+  // Render component
   return (
-    <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4 w-full">
-      {/* Key Metrics */}
-      <div className="col-span-1 md:col-span-2 lg:col-span-4">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <div className="bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
-            <p className="text-xs text-gray-500">Total Revenue</p>
-            <p className="text-xl font-semibold text-gray-900">${totalRevenue.toLocaleString()}</p>
+    <div className="bg-gray-50 min-h-screen">
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-3xl font-bold text-gray-800 mb-6">
+          Pump Pressure Monitoring Dashboard
+        </h1>
+        
+        {/* Display loading state */}
+        {isLoading && (
+          <div className="flex items-center justify-center p-4 mb-6 bg-blue-50 rounded-md">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-700 mr-3"></div>
+            <p className="text-blue-700">Loading data...</p>
           </div>
-          <div className="bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
-            <p className="text-xs text-gray-500">Total Profit</p>
-            <p className="text-xl font-semibold text-gray-900">${totalProfit.toLocaleString()}</p>
+        )}
+        
+        {/* Display error state */}
+        {error && (
+          <div className="p-4 mb-6 bg-red-50 rounded-md border border-red-200">
+            <h2 className="text-lg font-semibold text-red-700 mb-2">Error Loading Data</h2>
+            <p className="text-red-600 mb-4">{error}</p>
+            <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-2">
+              <button 
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                onClick={handleTestFetch}
+              >
+                Test Data Fetch
+              </button>
+              <button 
+                className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+                onClick={() => window.location.reload()}
+              >
+                Reload Page
+              </button>
+            </div>
           </div>
-          <div className="bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
-            <p className="text-xs text-gray-500">Customers</p>
-            <p className="text-xl font-semibold text-gray-900">{totalCustomers.toLocaleString()}</p>
+        )}
+        
+        {/* Main dashboard content - stacked vertically */}
+        {!error && (
+          <div className="grid grid-cols-1 gap-6">
+            {/* Metrics section */}
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <h2 className="text-xl font-semibold text-gray-800 mb-4">Key Metrics</h2>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <div className="bg-blue-50 p-3 rounded-md">
+                  <p className="text-sm text-blue-600">Avg Pressure</p>
+                  <p className="text-2xl font-bold text-blue-700">{metrics.averagePressure} PSI</p>
+                </div>
+                <div className="bg-green-50 p-3 rounded-md">
+                  <p className="text-sm text-green-600">Max Pressure</p>
+                  <p className="text-2xl font-bold text-green-700">{metrics.maxPressure} PSI</p>
+                </div>
+                <div className="bg-purple-50 p-3 rounded-md">
+                  <p className="text-sm text-purple-600">Min Pressure</p>
+                  <p className="text-2xl font-bold text-purple-700">{metrics.minPressure} PSI</p>
+                </div>
+                <div className="bg-red-50 p-3 rounded-md">
+                  <p className="text-sm text-red-600">Anomalies</p>
+                  <p className="text-2xl font-bold text-red-700">{metrics.anomalyCount}</p>
+                </div>
+                <div className="bg-orange-50 p-3 rounded-md">
+                  <p className="text-sm text-orange-600">Broken States</p>
+                  <p className="text-2xl font-bold text-orange-700">{metrics.brokenStateDuration}</p>
+                </div>
+                <div className="bg-yellow-50 p-3 rounded-md">
+                  <p className="text-sm text-yellow-600">Anomaly Rate</p>
+                  <p className="text-2xl font-bold text-yellow-700">{metrics.anomalyFrequency}%</p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Chart section with anomaly regions */}
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <h2 className="text-xl font-semibold text-gray-800 mb-4">Pump Data Analysis</h2>
+              
+              {/* Update the custom legend to remove Rolling Std */}
+              <div className="mb-4 text-sm text-gray-600 flex flex-wrap items-center space-x-6 justify-start">
+                <p className="flex items-center">
+                  <span className="w-4 h-0.5 inline-block bg-teal-500 mr-2"></span>
+                  Pressure
+                </p>
+                <p className="flex items-center">
+                  <span className="w-4 h-3 inline-block bg-pink-200 opacity-70 mr-2"></span>
+                  Anomaly Region
+                </p>
+                <p className="flex items-center">
+                  <span className="w-4 h-0.5 inline-block border-b border-blue-500 border-dashed mr-2"></span>
+                  Rolling Mean
+                </p>
+                <p className="flex items-center">
+                  <span className="relative flex items-center justify-center w-4 h-4 mr-2">
+                    <span className="absolute w-0.5 h-4 bg-red-500 rotate-45"></span>
+                    <span className="absolute w-0.5 h-4 bg-red-500 -rotate-45"></span>
+                  </span>
+                  Broken State
+                </p>
+              </div>
+              
+              <div className="h-96">
+                {pumpData.length > 0 ? (
+                  <div className="relative h-full">
+                    {/* First layer: The anomaly regions as an area chart with pink fill */}
+                    <div className="absolute inset-0 z-0">
+                      <AreaChart
+                        data={pumpData.map((point, idx) => {
+                          // Skip first few data points that might render before visible time axis
+                          if (idx < 4) return {
+                            timestamp: new Date(point.timestamp).toLocaleDateString('en-US', {
+                              month: 'numeric',
+                              day: 'numeric'
+                            }),
+                            anomalyRegion: 0
+                          };
+                          
+                          return {
+                            timestamp: new Date(point.timestamp).toLocaleDateString('en-US', {
+                              month: 'numeric',
+                              day: 'numeric'
+                            }),
+                            // For each point, check if it's in an anomaly region
+                            anomalyRegion: (point.pressure > 70 || point.pressure < 35 || 
+                                           brokenStates.includes(idx) || 
+                                           anomalies.includes(idx)) ? 100 : 0
+                          };
+                        })}
+                        index="timestamp"
+                        categories={["anomalyRegion"]}
+                        colors={["rgba(252, 231, 243, 0.7)"]} // Light pink (pink-200) with transparency
+                        valueFormatter={(value: number) => ``} // No value formatting needed
+                        showLegend={false}
+                        showGrid={false}
+                        showXAxis={false}
+                        showYAxis={false}
+                      />
+                    </div>
+
+                    {/* Second layer: The main line chart with pressure and statistics */}
+                    <LineChart
+                      data={pumpData.map((point, idx) => {
+                        // Only include data points that will appear in the visible area
+                        if (idx < 4) {
+                          // For the first few points, return null values to create space
+                          return {
+                            timestamp: new Date(point.timestamp).toLocaleDateString('en-US', {
+                              month: 'numeric',
+                              day: 'numeric'
+                            }),
+                            pressure: undefined,
+                            rollingMean: undefined
+                          };
+                        }
+
+                        return {
+                          timestamp: new Date(point.timestamp).toLocaleDateString('en-US', {
+                            month: 'numeric',
+                            day: 'numeric'
+                          }),
+                          pressure: point.pressure,
+                          rollingMean: rollingStats.mean[idx]?.value ?? undefined,
+                        };
+                      })}
+                      index="timestamp"
+                      categories={["pressure", "rollingMean"]}
+                      colors={[
+                        "rgb(75, 192, 192)", // Pressure - Teal (original)
+                        "rgba(54, 162, 235, 0.8)", // Rolling Mean - Blue (original)
+                      ]}
+                      valueFormatter={(value: number) => `${value} PSI`}
+                      showLegend={false}
+                      showGrid={true}
+                    />
+
+                    {/* Third layer: Overlay broken state markers directly on pressure points */}
+                    {brokenStates.map((idx) => {
+                      // Skip markers too close to y-axis or too early in the dataset
+                      if (idx < 4) return null;
+                      
+                      // Get exact pressure value for vertical alignment
+                      const pressure = pumpData[idx]?.pressure || 0;
+                      
+                      // Calculate position to align directly with pressure line
+                      // Use chart y-axis scale to position marker
+                      const topPosition = 100 - ((pressure - metrics.minPressure) / 
+                                        (metrics.maxPressure - metrics.minPressure) * 80);
+                      
+                      // Horizontal position calculation - adjust to ensure markers are within visible time axis
+                      // The 94% is to account for the chart's right padding
+                      const leftPosition = ((idx - 4) / (pumpData.length - 4)) * 94;
+                      
+                      return (
+                        <div 
+                          key={`broken-${idx}`}
+                          className="absolute flex items-center justify-center pointer-events-none z-10"
+                          style={{
+                            left: `${leftPosition}%`,
+                            top: `${topPosition}%`,
+                            width: '8px',  // Smaller marker
+                            height: '8px', // Smaller marker
+                            transform: 'translate(-50%, -50%)',
+                          }}
+                        >
+                          {/* Smaller X marker for broken states */}
+                          <div className="absolute w-0.5 h-3 bg-red-500 rotate-45"></div>
+                          <div className="absolute w-0.5 h-3 bg-red-500 -rotate-45"></div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-full bg-gray-50 rounded-md">
+                    <p className="text-gray-500">No data available</p>
+                  </div>
+                )}
+              </div>
+              
+              <div className="mt-4 text-sm text-gray-600 text-right">
+                <p className="text-xs text-gray-500">Data points: {pumpData.length}</p>
+              </div>
+            </div>
           </div>
-          <div className="bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
-            <p className="text-xs text-gray-500">Conversion Rate</p>
-            <p className="text-xl font-semibold text-gray-900">{conversionRate}</p>
-          </div>
-          <div className="bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
-            <p className="text-xs text-gray-500">Avg Order Value</p>
-            <p className="text-xl font-semibold text-gray-900">${averageOrderValue}</p>
-          </div>
-          <div className="bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
-            <p className="text-xs text-gray-500">Profit Margin</p>
-            <p className="text-xl font-semibold text-gray-900">{profitMargin}</p>
-          </div>
-        </div>
+        )}
       </div>
-
-      {/* Charts */}
-      <Card className="col-span-1 md:col-span-2 lg:col-span-4">
-        <CardHeader className="pb-1 pt-3">
-          <CardTitle className="text-base font-medium">Sales Overview</CardTitle>
-          <CardDescription className="text-xs">Monthly sales and profit data</CardDescription>
-        </CardHeader>
-        <CardContent className="p-3">
-          <div className="h-60">
-            <AreaChart
-              data={salesData}
-              index="date"
-              categories={["Sales", "Profit", "Expenses"]}
-              colors={colors.salesOverview}
-              valueFormatter={(value) => `$${value.toLocaleString()}`}
-              showLegend={true}
-              showGrid={true}
-              showXAxis={true}
-              showYAxis={true}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="col-span-1 md:col-span-1 lg:col-span-2">
-        <CardHeader className="pb-1 pt-3">
-          <CardTitle className="text-base font-medium">Product Performance</CardTitle>
-          <CardDescription className="text-xs">Top selling products</CardDescription>
-        </CardHeader>
-        <CardContent className="p-3">
-          <div className="h-60">
-            <BarChart
-              data={productData}
-              index="name"
-              categories={["sales"]}
-              colors={colors.productPerformance}
-              valueFormatter={(value) => `$${value.toLocaleString()}`}
-              showLegend={false}
-              showGrid={true}
-              layout="horizontal"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="col-span-1 md:col-span-1 lg:col-span-2">
-        <CardHeader className="pb-1 pt-3">
-          <CardTitle className="text-base font-medium">Sales by Category</CardTitle>
-          <CardDescription className="text-xs">Distribution across categories</CardDescription>
-        </CardHeader>
-        <CardContent className="p-3">
-          <div className="h-60">
-            <DonutChart
-              data={categoryData}
-              category="value"
-              index="name"
-              valueFormatter={(value) => `${value}%`}
-              colors={colors.categories}
-              centerText="Categories"
-              paddingAngle={0}
-              showLabel={false}
-              showLegend={true}
-              innerRadius={45}
-              outerRadius="90%"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="col-span-1 md:col-span-1 lg:col-span-2">
-        <CardHeader className="pb-1 pt-3">
-          <CardTitle className="text-base font-medium">Regional Sales</CardTitle>
-          <CardDescription className="text-xs">Sales by geographic region</CardDescription>
-        </CardHeader>
-        <CardContent className="p-3">
-          <div className="h-60">
-            <BarChart
-              data={regionalData}
-              index="region"
-              categories={["sales"]}
-              colors={colors.regional}
-              valueFormatter={(value) => `$${value.toLocaleString()}`}
-              showLegend={false}
-              showGrid={true}
-              layout="horizontal"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="col-span-1 md:col-span-1 lg:col-span-2">
-        <CardHeader className="pb-1 pt-3">
-          <CardTitle className="text-base font-medium">Customer Demographics</CardTitle>
-          <CardDescription className="text-xs">Spending by age group</CardDescription>
-        </CardHeader>
-        <CardContent className="p-3">
-          <div className="h-60">
-            <BarChart
-              data={demographicsData}
-              index="ageGroup"
-              categories={["spending"]}
-              colors={colors.demographics}
-              valueFormatter={(value) => `$${value}`}
-              showLegend={false}
-              showGrid={true}
-              layout="horizontal"
-            />
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
-} 
+}

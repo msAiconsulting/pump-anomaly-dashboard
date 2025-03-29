@@ -1,7 +1,7 @@
 "use client";
 
 import { CopilotSidebar } from "@copilotkit/react-ui";
-import { Dashboard } from "../components/Dashboard";
+import Dashboard from "../components/Dashboard";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
 import { CustomAssistantMessage } from "../components/AssistantMessage";
