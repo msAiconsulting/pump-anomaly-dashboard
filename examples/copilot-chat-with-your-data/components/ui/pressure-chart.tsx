@@ -190,8 +190,8 @@ export function PressureChart({
   // Custom tooltip to show formatted data
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
-      const isAnomaly = payload.find((p: any) => p.name === 'isAnomaly')?.value;
-      const anomalyRegion = payload.find((p: any) => p.name === 'anomalyRegion')?.value;
+      const isAnomaly = payload[0]?.payload?.isAnomaly;
+      const anomalyRegion = payload[0]?.payload?.anomalyRegion;
       const originalTimestamp = payload[0]?.payload?.originalTimestamp;
       
       // Format the full date and time for the tooltip
