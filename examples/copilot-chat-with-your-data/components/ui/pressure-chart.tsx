@@ -427,8 +427,6 @@ export function PressureChart({
                 animationDuration={1500}
                 animationEasing="ease"
               />
-              
-              <Legend />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
