@@ -738,6 +738,9 @@ You can help the user interpret this data, suggest maintenance actions, or expla
                   <p className="text-2xl font-bold text-yellow-700">{metrics.anomalyFrequency}%</p>
                 </div>
               </div>
+              <div className="mt-2 text-right">
+                <p className="text-xs text-gray-500">Data points: {pumpData.length}</p>
+              </div>
             </div>
             
             {/* Chart section with anomaly regions */}
@@ -782,10 +785,6 @@ You can help the user interpret this data, suggest maintenance actions, or expla
                     <p className="text-gray-500">No data available</p>
                   </div>
                 )}
-              </div>
-              
-              <div className="mt-4 text-sm text-gray-600 text-right">
-                <p className="text-xs text-gray-500">Data points: {pumpData.length}</p>
               </div>
             </div>
           </div>
