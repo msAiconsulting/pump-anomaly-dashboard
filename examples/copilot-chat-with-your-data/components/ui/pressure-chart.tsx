@@ -308,7 +308,7 @@ export function PressureChart({
       <div className="overflow-x-auto flex-grow">
         <div style={{ 
           width: '100%', 
-          height: '100%', 
+          height: '300px', 
           minWidth: currentView === 'all' ? `${Math.max(800, data.length * 3)}px` : `${zoomedData.length * 5}px` 
         }}>
           <ResponsiveContainer width="100%" height="100%">
