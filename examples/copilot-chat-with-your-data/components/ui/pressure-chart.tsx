@@ -222,10 +222,10 @@ export function PressureChart({
             );
           })}
           {isAnomaly && (
-            <p className="text-sm font-medium text-orange-500 mt-1">ANOMALY DETECTED</p>
+            <p className="text-sm font-medium text-orange-500 mt-1">Anomaly</p>
           )}
           {anomalyRegion > 0 && (
-            <p className="text-sm font-medium text-pink-500 mt-1">IN ANOMALY REGION</p>
+            <p className="text-sm font-medium text-pink-500 mt-1">Anomaly Region</p>
           )}
         </div>
       );
