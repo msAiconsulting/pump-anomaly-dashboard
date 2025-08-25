@@ -60,7 +60,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Chart animations and zoom controls
 
 - **Branding Updates**
-  - Integration of Intuigence logo
+  - Integration of msAi logo
   - Title changes for better clarity
   - Header styling improvements
   - Professional appearance enhancements

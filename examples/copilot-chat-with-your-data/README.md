@@ -1,8 +1,8 @@
-# Pump Anomaly Detection Dashboard 🚀
+# msAi Pump Anomaly Detection Dashboard 🚀
 
-A sophisticated, AI-powered dashboard for real-time pump pressure monitoring and anomaly detection, built with modern web technologies and machine learning capabilities.
+A sophisticated, AI-powered dashboard for real-time pump pressure monitoring and anomaly detection, built with modern web technologies and machine learning capabilities by msAi Consulting.
 
-![Dashboard Screenshot](public/assets/intuigence.png)
+![Dashboard Screenshot](public/assets/msai_logo_transparent.png)
 
 ## 🌟 Features
 
@@ -265,6 +265,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Built with ❤️ by the msAiConsulting Team**
+**Built with ❤️ by the msAi Consulting Team**
 
 *Last updated: August 25, 2025* 

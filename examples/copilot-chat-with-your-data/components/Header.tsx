@@ -8,8 +8,8 @@ export function Header() {
       <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-start sm:items-center">
         <div>
           <Image 
-            src="/assets/intuigence.png" 
-            alt="Intuigence" 
+            src="/assets/msai_logo_transparent.png" 
+                          alt="msAi - AI Industrial Intelligence" 
             width={204} 
             height={52} 
             priority 
