@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --copilot-kit-primary-color: #3b82f6;
+  --copilot-kit-contrast-color: white;
+  --copilot-kit-secondary-contrast-color: #1e293b;
+  --copilot-kit-background-color: white;
+  --copilot-kit-muted-color: #64748b;
+  --copilot-kit-separator-color: rgba(0, 0, 0, 0.08);
+  --copilot-kit-scrollbar-color: rgba(0, 0, 0, 0.2);
+}
+
+/* Custom CopilotKit styling to match dashboard */
+.copilotKitSidebar .copilotKitWindow {
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+.copilotKitButton {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
